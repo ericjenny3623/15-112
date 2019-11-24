@@ -19,22 +19,24 @@ class SimulationApp(App):
         self.FIELD_REAL_WIDTH = 8.23  # meters
         self.FIELD_REAL_HEIGHT = 9  # 16.46
 
-        self.robot = RobotModel(1, 1)
+        self.robot = RobotModel(1.0, 1.0, 0.0)
         self._robotImage = self.scaleImage(self.loadImage("steve.jpg"), 0.6)
         self.leftVoltage, self.rightVoltage = 0.0, 0.0
         self.forwardVoltage, self.turnVotlage = 0.0, 0.0
 
         self.waypoints = []
-        self.waypointRadius = 20
+        self.waypointRadius = 30
         self.selectedWaypoint = None
+        self.rotatingWaypoint = False
 
         self.timerDelay = 30  # milliseconds
         self.timer = 0
         self.releaseDelay = 0.1
-        self.upKey = KeyLatch(self.releaseDelay)
-        self.downKey = KeyLatch(self.releaseDelay)
-        self.rightKey = KeyLatch(self.releaseDelay)
-        self.leftKey = KeyLatch(self.releaseDelay)
+        self.inputKeys = {"Up": KeyLatch(self.releaseDelay),
+                          "Down": KeyLatch(self.releaseDelay),
+                          "Right": KeyLatch(self.releaseDelay),
+                          "Left": KeyLatch(self.releaseDelay)}
+
 
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
@@ -43,11 +45,15 @@ class SimulationApp(App):
             self.leftVoltage, self.rightVoltage, deltaTime)
         self.robot.updatePositionWithVelocity(deltaTime)
 
+        self.driveUsingKeys()
+
+
+    def driveUsingKeys(self):
         avgVoltage = (self.leftVoltage + self.rightVoltage) / 2.0
         turnVoltage = 2.0
-        if self.upKey.getIsActive(self.timer):
-            avgVoltage += 9.0
-        elif self.downKey.getIsActive(self.timer):
+        if self.inputKeys["Up"].getIsActive(self.timer):
+            avgVoltage += 0.9
+        elif self.inputKeys["Down"].getIsActive(self.timer):
             avgVoltage -= 0.9
         else:
             turnVoltage = 4.0
@@ -60,85 +66,68 @@ class SimulationApp(App):
                 if avgVoltage > 0.0:
                     avgVotlage = 0.0
 
-        self.leftVoltage = self.limitVoltage(avgVoltage, 10.0)
-        self.rightVoltage = self.limitVoltage(avgVoltage, 10.0)
+        self.leftVoltage = Utils.limit(avgVoltage, 10.0, -10.0)
+        self.rightVoltage = Utils.limit(avgVoltage, 10.0, -10.0)
 
-        if self.rightKey.getIsActive(self.timer):
+        if self.inputKeys["Right"].getIsActive(self.timer):
             self.leftVoltage += turnVoltage
             self.rightVoltage -= turnVoltage
-        elif self.leftKey.getIsActive(self.timer):
+        elif self.inputKeys["Left"].getIsActive(self.timer):
             self.leftVoltage -= turnVoltage
             self.rightVoltage += turnVoltage
-        print(self.robot.center.velocity)
 
-    def limitVoltage(self, voltage, max):
-        if voltage > max:
-            voltage = max
-        elif voltage < -max:
-            voltage = -max
-        return voltage
+
 
     def redrawAll(self, canvas):
         canvas.create_image(self.width/2, self.height/2,
                             image=self.fieldImageScaled)
         robotAppX, robotAppY = self.realWorldToAppCoords(
             self.robot.center.x, self.robot.center.y)
-        r = 30
         rotatedRobot = self._robotImage.rotate(-self.robot.center.heading)
         canvas.create_image(robotAppX, robotAppY,
                             image=ImageTk.PhotoImage(rotatedRobot))
 
-        r = self.waypointRadius
-        i = 0
-        for waypoint in self.waypoints:
-            x, y = self.realWorldToAppCoords(waypoint.x, waypoint.y)
-            canvas.create_oval(x+r, y+r,
-                               x-r, y-r,
-                               fill="yellow")
-            canvas.create_text(x, y, anchor="c", text=f"{i}")
-            i += 1
+        for i, waypoint in enumerate(self.waypoints):
+            self.drawNode(canvas, waypoint, i)
+
 
     def keyPressed(self, event):
         key = event.key
-        if key == "Up":
-            self.upKey.lastEventRelease = False
-        elif key == "Down":
-            self.downKey.lastEventRelease = False
-        elif key == "Right":
-            self.rightKey.lastEventRelease = False
-        elif key == "Left":
-            self.leftKey.lastEventRelease = False
+        if key in self.inputKeys:
+            self.inputKeys[key].lastEventRelease = False
+        elif key == "Delete":
+            if self.selectedWaypoint is not None:
+                self.waypoints.remove(self.selectedWaypoint)
+                self.selectedWaypoint = None
         else:
             None
 
     def keyReleased(self, event):
         key = event.key
-        if key == "Up":
-            self.upKey.lastEventRelease = True
-            self.upKey.timeLastRelease = self.timer
-        elif key == "Down":
-            self.downKey.lastEventRelease = True
-            self.downKey.timeLastRelease = self.timer
-        elif key == "Right":
-            self.rightKey.lastEventRelease = True
-            self.rightKey.timeLastRelease = self.timer
-        elif key == "Left":
-            self.leftKey.lastEventRelease = True
-            self.leftKey.timeLastRelease = self.timer
+        if key in self.inputKeys:
+            self.inputKeys[key].lastEventRelease = True
+            self.inputKeys[key].timeLastRelease = self.timer
         else:
             None
 
     def mousePressed(self, event):
+        self.cursorX, self.cursorY = event.x, event.y
+        self.selectedWaypoint = None
         for waypoint in self.waypoints:
             appWaypointX, appWaypointY = self.realWorldToAppCoords(
                 waypoint.x, waypoint.y)
             if Utils.distance(appWaypointX, appWaypointY, event.x, event.y) < self.waypointRadius:
                 self.selectedWaypoint = waypoint
-                self.cursorX, self.cursorY = event.x, event.y
+                newAngle = math.degrees(-math.atan2(appWaypointX - event.x,
+                                        appWaypointY - event.y))
+                if abs(newAngle - self.selectedWaypoint.heading) < 30.0:
+                    self.rotatingWaypoint = True
+                else:
+                    self.rotatingWaypoint = False
 
-        if self.selectedWaypoint is None:
+        if self.selectedWaypoint is None: # New waypoint
             x, y = self.appToRealWorldCoords(event.x, event.y)
-            newWaypoint = Waypoint(x, y)
+            newWaypoint = Waypoint(x, y, 0.0)
             self.waypoints.append(newWaypoint)
 
     def mouseDragged(self, event):
@@ -147,15 +136,20 @@ class SimulationApp(App):
         if self.selectedWaypoint is not None:
             appWaypointX, appWaypointY = self.realWorldToAppCoords(
                 self.selectedWaypoint.x, self.selectedWaypoint.y)
-            appWaypointX += dX
-            appWaypointY += dY
-            waypointX, waypointY = self.appToRealWorldCoords(
-                appWaypointX, appWaypointY)
-            self.selectedWaypoint.x, self.selectedWaypoint.y = waypointX, waypointY
+            if self.rotatingWaypoint:
+                newAngle = math.degrees(-math.atan2(appWaypointX - event.x,
+                                                    appWaypointY - event.y))
+                self.selectedWaypoint.setPosition(heading=newAngle)
+            else:
+                appWaypointX += dX
+                appWaypointY += dY
+                waypointX, waypointY = self.appToRealWorldCoords(
+                    appWaypointX, appWaypointY)
+                self.selectedWaypoint.x, self.selectedWaypoint.y = waypointX, waypointY
         self.cursorX, self.cursorY = event.x, event.y
 
     def mouseReleased(self, event):
-        self.selectedWaypoint = None
+        None
 
     def realWorldToAppCoords(self, x, y):
         newX = (self.width/2) + (self.width/self.FIELD_REAL_WIDTH*x)
@@ -183,12 +177,26 @@ class SimulationApp(App):
         scaledFieldImage = self.scaleImage(self._fieldImage, scaleFactor)
         self.fieldImageScaled = ImageTk.PhotoImage(scaledFieldImage)
 
+    def drawNode(self, canvas, node, i):
+        r = self.waypointRadius
+        x, y = self.realWorldToAppCoords(node.x, node.y)
+        canvas.create_oval(x+r, y+r,
+                            x-r, y-r,
+                            fill="yellow")
+        x1 = x + (r * 1.3 * math.sin(node.r))
+        y1 = y - (r * 1.3 * math.cos(node.r))
+        canvas.create_line(x, y, x1, y1, width=r/3, fill="gold")
+        canvas.create_text(x, y, anchor="c", text=f"{i}")
 
-class Waypoint():
 
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+
+
+
+class Waypoint(Utils.Twist):
+
+    def __init__(self, x, y, heading):
+        super().__init__(x, y, heading)
+
 
 
 class KeyLatch():
