@@ -4,13 +4,13 @@ import math
 
 class RobotModel():
 
-    def __init__(self, x, y):
-        self.center = Utils.Twist(x, y, 0.0)
+    def __init__(self, x, y, heading):
+        self.center = Utils.Twist(x, y, heading)
         self.leftSide, self.rightSide = self.DrivetrainSide(), self.DrivetrainSide()
         self.WHEEL_BASE = 0.67  # Meters
 
     def setPosition(self, x, y, heading):
-        self.x, self.y, self.heading = x, y, heading
+        self.center.setPosition(x, y, heading)
 
     def zero(self):
         self.leftSide.velocity = 0.0
@@ -19,8 +19,14 @@ class RobotModel():
         self.rightSide.acceleration = 0.0
 
     def updateVoltage(self, leftVoltage, rightVoltage, time):
+        leftVoltage = self.limitVoltage(leftVoltage, 12.0)
+        rightVoltage = self.limitVoltage(rightVoltage, 12.0)
         self.leftSide.updateVoltage(leftVoltage, time)
         self.rightSide.updateVoltage(rightVoltage, time)
+
+    def limitVoltage(self, voltage, max):
+        return Utils.limit(voltage, max, -max)
+
 
     def updatePositionWithVelocity(self, deltaTime):
         if self.leftSide.velocity != self.rightSide.velocity:
@@ -152,6 +158,6 @@ class CIMMotor(Motor):
     def __init__(self):
         super().__init__(2.41, 5330, 130.1, 3.8)
 
-
-cim = CIMMotor()
-print(cim.kSlopeTorque)
+if __name__ == "__main__":
+    cim = CIMMotor()
+    print(cim.kSlopeTorque)
