@@ -37,7 +37,7 @@ class SimulationApp(App):
         self.lastClickTime = 0
         self.DOUBLE_CLICK_TIME = 0.2
 
-        self.timerDelay = 30  # milliseconds
+        self.timerDelay = 50  # milliseconds
         self.timer = 0
         self.releaseDelay = 0.1
         self.inputKeys = {"Up": KeyLatch(self.releaseDelay),
@@ -128,6 +128,8 @@ class SimulationApp(App):
             if self.selectedWaypoint is not None:
                 self.waypoints.remove(self.selectedWaypoint)
                 self.selectedWaypoint = None
+        elif key == "r":
+            self.controls.reset()
         elif key == "a":
             self.autoDriving = not self.autoDriving
             self.autoDrivingStart = True
@@ -222,16 +224,21 @@ class SimulationApp(App):
         r = self.waypointRadius
         x, y = self.realWorldToAppCoords(node.x, node.y)
         color = self.numberToColor(node.kSpeed)
-        # if node.isCritical:
-        #     color = "red"
-        # else:
-        #     color = "yellow"
-        canvas.create_oval(x+r, y+r,
-                           x-r, y-r,
-                           fill=color)
+        r2 = r
+        if node.isCritical:
+            canvas.create_oval(x+r, y+r,
+                    x-r, y-r,
+                    fill="white")
+            r2 = 0.7*r
+        canvas.create_oval(x+r2, y+r2,
+                           x-r2, y-r2,
+                           fill=color,
+                           outline="white")
         x1 = x + (r * 1.3 * math.sin(node.r))
+        x2 = x + (r * 0.3 * math.sin(node.r))
         y1 = y - (r * 1.3 * math.cos(node.r))
-        canvas.create_line(x, y, x1, y1, width=r/4, fill="gold")
+        y2 = y - (r * 0.3 * math.cos(node.r))
+        canvas.create_line(x2, y2, x1, y1, width=r/4, fill="gold")
         canvas.create_text(x, y, anchor="c", text=f"{i}")
 
     def numberToColor(self, x):
