@@ -2,7 +2,11 @@ import math
 
 
 def withinThreshold(value, goal, epsilon):
-    return math.abs(value-goal) <= epsilon
+    return abs(value-goal) <= epsilon
+
+
+def withinDistance(distance, tolerance):
+    return withinThreshold(distance, 0.0, tolerance)
 
 
 def sideFromLawOfSines(a, sinA, sinB):
@@ -13,12 +17,16 @@ def distance(x1, y1, x2, y2):
     return ((x1-x2)**2 + (y1-y2)**2)**0.5
 
 
-def limit(x, max, min):
-    assert max > min, "Max not greater than min"
-    if x > max:
-        return max
-    elif x < min:
-        return min
+def hypotenuseLength(a, b):
+    return distance(0.0, 0.0, a, b)
+
+
+def limit(x, maxVal, minVal):
+    assert maxVal > minVal, "Max not greater than min"
+    if x > maxVal:
+        return maxVal
+    elif x < minVal:
+        return minVal
     else:
         return x
 
