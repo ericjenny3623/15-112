@@ -388,8 +388,8 @@ class App(object):
         try:
             app.redrawAll(app._canvas)
             hash2 = getHash(app) if app._mvcCheck else None
-            if (hash1 != hash2):
-                app._mvcViolation('you may not change the app state (the model) in redrawAll (the view)')
+            # if (hash1 != hash2):
+            #     app._mvcViolation('you may not change the app state (the model) in redrawAll (the view)')
         finally:
             app._canvas.inRedrawAll = False
         app._canvas.update()
@@ -477,7 +477,7 @@ class App(object):
         event = App.KeyEventWrapper(event)
         if (not event.key == 'Modifier_Key'):
             app.keyReleased(event)
-            app._redrawAllWrapper()
+            # app._redrawAllWrapper()
 
     @_safeMethod
     def _mousePressedWrapper(app, event):
@@ -491,7 +491,7 @@ class App(object):
             app._lastMousePosn = (event.x, event.y)
             if (app._methodIsOverridden('mousePressed')):
                 app.mousePressed(event)
-                app._redrawAllWrapper()
+                # app._redrawAllWrapper()
 
     @_safeMethod
     def _mouseReleasedWrapper(app, event):
@@ -504,7 +504,7 @@ class App(object):
             app._lastMousePosn = (event.x, event.y)
             if (app._methodIsOverridden('mouseReleased')):
                 app.mouseReleased(event)
-                app._redrawAllWrapper()
+                # app._redrawAllWrapper()
 
     @_safeMethod
     def _timerFiredWrapper(app):
