@@ -30,6 +30,8 @@ class SimulationApp(App):
             target=self.odometryPeriodic, daemon=True)
         odometryThread.start()
 
+        self.logger = {}
+
         self.waypoints = []
         self.waypointRadius = 30
         self.selectedWaypoint = None
@@ -123,10 +125,10 @@ class SimulationApp(App):
         path = self.controls.getPath()
 
         for i in range(len(path)-1): #len(path)-1):
-            pointX, pointY = path[i][0], path[i][1]
-            pX1, pY1 = self.realWorldToAppCoords(pointX, pointY)
-            nextPointX, nextPointY = path[i+1][0], path[i+1][1]
-            pX2, pY2 = self.realWorldToAppCoords(nextPointX, nextPointY)
+            point = path[i]
+            pX1, pY1 = self.realWorldToAppCoords(point[0], point[1])
+            nextPoint = path[i+1]
+            pX2, pY2 = self.realWorldToAppCoords(nextPoint[0], nextPoint[1])
             canvas.create_line(pX1, pY1, pX2, pY2, fill="white")
 
 
