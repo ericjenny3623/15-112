@@ -8,6 +8,9 @@ from tkinter import *
 from robot import RobotModel
 import Utils
 import math
+from controls import Controls
+import threading
+import time
 
 
 class SimulationApp(App):
@@ -22,12 +25,17 @@ class SimulationApp(App):
         self.robot = RobotModel(1.0, 1.0, 0.0)
         self._robotImage = self.scaleImage(self.loadImage("steve.jpg"), 0.6)
         self.leftVoltage, self.rightVoltage = 0.0, 0.0
-        self.forwardVoltage, self.turnVotlage = 0.0, 0.0
+        self.ODOMETRY_UPDATE_RATE = 100
+        odometryThread = threading.Thread(
+            target=self.odometryPeriodic, daemon=True)
+        odometryThread.start()
 
         self.waypoints = []
         self.waypointRadius = 30
         self.selectedWaypoint = None
         self.rotatingWaypoint = False
+        self.lastClickTime = 0
+        self.DOUBLE_CLICK_TIME = 0.2
 
         self.timerDelay = 30  # milliseconds
         self.timer = 0
@@ -36,17 +44,41 @@ class SimulationApp(App):
                           "Down": KeyLatch(self.releaseDelay),
                           "Right": KeyLatch(self.releaseDelay),
                           "Left": KeyLatch(self.releaseDelay)}
+        self.autoDriving = False
+        self.autoDrivingStart = False
 
+        self.controls = Controls(self.waypoints, self.robot)
+        self.CONTROLS_UPDATE_RATE = 100
+        controlThread = threading.Thread(
+            target=self.controlsPeriodic, daemon=True)
+        controlThread.start()
 
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
         self.timer += deltaTime
-        self.robot.updateVoltage(
-            self.leftVoltage, self.rightVoltage, deltaTime)
-        self.robot.updatePositionWithVelocity(deltaTime)
 
-        self.driveUsingKeys()
+    def odometryPeriodic(self):
+        while True:
+            deltaTime = 1.0/self.ODOMETRY_UPDATE_RATE
+            self.robot.updateVoltage(
+                self.leftVoltage, self.rightVoltage, deltaTime)
+            self.robot.updatePositionWithVelocity(deltaTime)
+            time.sleep(deltaTime)
 
+    def controlsPeriodic(self):
+        while True:
+            if self.autoDriving and self.waypoints:
+                self.driveUsingPursuit()
+            else:
+                self.driveUsingKeys()
+            time.sleep(1.0/self.CONTROLS_UPDATE_RATE)
+
+    def driveUsingPursuit(self):
+        if self.autoDrivingStart:
+            self.autoDrivingStart = False
+            startPoint = self.waypoints[self.controls.index]
+            self.robot.center.setPosition(startPoint.x, startPoint.y, heading=startPoint.heading)
+        self.leftVoltage, self.rightVoltage = self.controls.updatePursuit()
 
     def driveUsingKeys(self):
         avgVoltage = (self.leftVoltage + self.rightVoltage) / 2.0
@@ -76,8 +108,6 @@ class SimulationApp(App):
             self.leftVoltage -= turnVoltage
             self.rightVoltage += turnVoltage
 
-
-
     def redrawAll(self, canvas):
         canvas.create_image(self.width/2, self.height/2,
                             image=self.fieldImageScaled)
@@ -90,7 +120,6 @@ class SimulationApp(App):
         for i, waypoint in enumerate(self.waypoints):
             self.drawNode(canvas, waypoint, i)
 
-
     def keyPressed(self, event):
         key = event.key
         if key in self.inputKeys:
@@ -99,6 +128,13 @@ class SimulationApp(App):
             if self.selectedWaypoint is not None:
                 self.waypoints.remove(self.selectedWaypoint)
                 self.selectedWaypoint = None
+        elif key == "a":
+            self.autoDriving = not self.autoDriving
+            self.autoDrivingStart = True
+        elif key == "w":
+            self.incrementWaypointSpeed(0.05)
+        elif key == "s":
+            self.incrementWaypointSpeed(-0.05)
         else:
             None
 
@@ -119,16 +155,21 @@ class SimulationApp(App):
             if Utils.distance(appWaypointX, appWaypointY, event.x, event.y) < self.waypointRadius:
                 self.selectedWaypoint = waypoint
                 newAngle = math.degrees(-math.atan2(appWaypointX - event.x,
-                                        appWaypointY - event.y))
-                if abs(newAngle - self.selectedWaypoint.heading) < 30.0:
+                                                    appWaypointY - event.y))
+                if self.timer - self.lastClickTime < self.DOUBLE_CLICK_TIME:
+                    waypoint.isCritical = not waypoint.isCritical
+                if abs(newAngle - self.selectedWaypoint.heading) < 40.0:
                     self.rotatingWaypoint = True
                 else:
                     self.rotatingWaypoint = False
 
-        if self.selectedWaypoint is None: # New waypoint
+        if self.selectedWaypoint is None:  # New waypoint
             x, y = self.appToRealWorldCoords(event.x, event.y)
-            newWaypoint = Waypoint(x, y, 0.0)
+            newWaypoint = Waypoint(x, y, 0.0, 0.6)
             self.waypoints.append(newWaypoint)
+            self.selectedWaypoint = newWaypoint
+
+        self.lastClickTime = self.timer
 
     def mouseDragged(self, event):
         dX = event.x - self.cursorX
@@ -173,31 +214,57 @@ class SimulationApp(App):
 
         self.height = int(imageHeight * scaleFactor)
         self.width = int(imageWidth * scaleFactor)
-        self.sizeChanged()
+        self.setSize(self.width, self.height)
         scaledFieldImage = self.scaleImage(self._fieldImage, scaleFactor)
         self.fieldImageScaled = ImageTk.PhotoImage(scaledFieldImage)
 
     def drawNode(self, canvas, node, i):
         r = self.waypointRadius
         x, y = self.realWorldToAppCoords(node.x, node.y)
+        color = self.numberToColor(node.kSpeed)
+        # if node.isCritical:
+        #     color = "red"
+        # else:
+        #     color = "yellow"
         canvas.create_oval(x+r, y+r,
-                            x-r, y-r,
-                            fill="yellow")
+                           x-r, y-r,
+                           fill=color)
         x1 = x + (r * 1.3 * math.sin(node.r))
         y1 = y - (r * 1.3 * math.cos(node.r))
-        canvas.create_line(x, y, x1, y1, width=r/3, fill="gold")
+        canvas.create_line(x, y, x1, y1, width=r/4, fill="gold")
         canvas.create_text(x, y, anchor="c", text=f"{i}")
 
+    def numberToColor(self, x):
+        scaled = 255 - abs(int(x * 255))
+        red, green, blue = scaled, scaled, scaled
+        if x < 0.0:
+            red = 255
+        elif x > 0.0:
+            green = 255
+        color = '#%02x%02x%02x' % (red, green, blue)  # set your favourite rgb color
+        return color
 
-
+    def incrementWaypointSpeed(self, delta):
+        if self.selectedWaypoint is not None:
+            speed = self.selectedWaypoint.kSpeed
+            speed += delta
+            speed = Utils.limit(speed, 1.0, -1.0)
+            self.selectedWaypoint.kSpeed = speed
 
 
 class Waypoint(Utils.Twist):
 
-    def __init__(self, x, y, heading):
+    def __init__(self, x, y, heading, kSpeed, isCritical=False):
         super().__init__(x, y, heading)
+        self.kSpeed = kSpeed
+        self.isCritical = isCritical
+
+    def toString(self):
+        return f"x: {self.x}, y: {self.y}, heading: {self.heading}, speed: {self.kSpeed}, critical: {self.isCritical}"
 
 
+    def __repr__(self):
+        return self.toString()
 
 class KeyLatch():
 
@@ -217,4 +284,4 @@ class KeyLatch():
 
 
 if __name__ == "__main__":
-    SimulationApp(width=1758, height=1944)
+    SimulationApp()
