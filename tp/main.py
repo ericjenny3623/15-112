@@ -120,6 +120,16 @@ class SimulationApp(App):
         for i, waypoint in enumerate(self.waypoints):
             self.drawNode(canvas, waypoint, i)
 
+        path = self.controls.getPath()
+
+        for i in range(len(path)-1): #len(path)-1):
+            pointX, pointY = path[i][0], path[i][1]
+            pX1, pY1 = self.realWorldToAppCoords(pointX, pointY)
+            nextPointX, nextPointY = path[i+1][0], path[i+1][1]
+            pX2, pY2 = self.realWorldToAppCoords(nextPointX, nextPointY)
+            canvas.create_line(pX1, pY1, pX2, pY2, fill="white")
+
+
     def keyPressed(self, event):
         key = event.key
         if key in self.inputKeys:

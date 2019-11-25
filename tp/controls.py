@@ -20,7 +20,11 @@ class Controls():
         self.MAX_SPEED = 3.3
 
         self.kV = 1.0 / 14.0 * 14.0
-        self.kTurn = 0.5 / 360.0
+        self.kTurn = 12.0 / 400.0
+
+    def reset(self):
+        self.index = 0
+        self.isFinished = False
 
     def updatePursuit(self):
         curWaypoint = self.waypoints[self.index]
@@ -72,14 +76,43 @@ class Controls():
             debug = True
 
         # if not in a special case, just run path following
-        return self.pathFollowing(robotPose, feedForwardSpeed)
+        return self.pathFollowing(feedForwardSpeed)
 
-    def pathFollowing(self, robotPose, ffSpeed):
+    def pathFollowing(self, ffSpeed):
         curWaypoint = self.waypoints[self.index]
         robotPose = self.robot.center
+        a, b = self.getPathGeometry(robotPose, curWaypoint)
+
+        nextSpeed = ((self.MAX_SPEED * ffSpeed) * 0.1) + \
+            (robotPose.velocity * 0.9)
+        deltaX = nextSpeed / self.UPDATE_RATE
+        if (deltaX < 0.0) == (ffSpeed > 0.0):
+            deltaX = 0.0
+
+        if deltaX != 0.0:
+            y2 = self.getYFromCoeffs(a, b, deltaX)
+            hypot = Utils.hypotenuseLength(deltaX, y2)
+            ratio = abs(deltaX / hypot)
+            deltaX *= ratio
+
+        self.kRadiusPath = abs(deltaX) * self.UPDATE_RATE * 0.1
+        dx2 = (3.0 * a * deltaX * deltaX) + (2.0 * b * deltaX)
+        relativeFeedForwardAngle = math.atan(dx2)
+
+        if False:
+            # print(f"{relativeAdjacDist} {relativeOpposDist} {relativeGoalDeriv}")
+            print(f"{a} {b} {deltaX}")
+
+        turnOutput = -math.degrees(relativeFeedForwardAngle)*self.UPDATE_RATE * self.kTurn
+        turnLimitedFFSpeed = math.copysign(abs(ffSpeed)-abs(turnOutput/12.0), ffSpeed)
+        outputLeft = (turnLimitedFFSpeed * self.kV * 12.0) + turnOutput
+        outputRight = (turnLimitedFFSpeed * self.kV * 12.0) - turnOutput
+
+        return outputLeft, outputRight
+
+    def getPathGeometry(self, robotPose, curWaypoint, returnPath=False):
         distanceToWaypoint = Utils.distance(robotPose.x, robotPose.y,
                                             curWaypoint.x, curWaypoint.y)
-        print(curWaypoint)
 
         straightPathAngle = math.atan2(
             curWaypoint.x - robotPose.x, curWaypoint.y - robotPose.y)
@@ -90,345 +123,37 @@ class Controls():
         # relativeGoalAngle = Utils.limit(relativeGoalAngle, math.PI/3.0,
         # -math.PI/3.0)
         relativeGoalDeriv = math.atan(relativeGoalAngle)
-        print("====", relativeAngle)
-        if relativeAdjacDist == 0:
-            print()
         a, b = self.generateSpline(
             relativeAdjacDist, relativeOpposDist, relativeGoalDeriv)
-
-        nextSpeed = ((self.MAX_SPEED * ffSpeed) * 0.1) + \
-            (robotPose.velocity * 0.9)
-        deltaX = nextSpeed / self.UPDATE_RATE
-        if (deltaX < 0.0) == (ffSpeed > 0.0):
-            deltaX = 0.0
-
-        if deltaX != 0.0:
-            y2 = (a * deltaX * deltaX * deltaX) + (b * deltaX * deltaX)
-            hypot = Utils.hypotenuseLength(deltaX, y2)
-            ratio = abs(deltaX / hypot)
-            deltaX *= ratio
-
-        self.kRadiusPath = abs(deltaX) * self.UPDATE_RATE * 0.1
-        dx2 = (3.0 * a * deltaX * deltaX) + (2.0 * b * deltaX)
-        relativeFeedForwardAngle = math.atan(dx2)
-
-        if False:
-            print(f"{relativeAdjacDist} {relativeOpposDist} {relativeGoalDeriv}")
-            print(f"{a} {b} {deltaX}")
-
-        turnOutput = -math.degrees(relativeFeedForwardAngle)*self.UPDATE_RATE * self.kTurn
-        outputLeft = ((ffSpeed * self.kV) + turnOutput) * 12.0
-        outputRight = ((ffSpeed * self.kV) - turnOutput) * 12.0
-
-        return outputLeft, outputRight
+        if not returnPath:
+            return a, b
+        else:
+            path = []
+            cos = math.cos(robotPose.r)
+            sin = math.sin(robotPose.r)
+            x = 0
+            while abs(x) <= abs(relativeAdjacDist):
+                y = self.getYFromCoeffs(a, b, x)
+                globalX = (x * sin) - (y * cos) + robotPose.x
+                globalY = (y * sin) + (x * cos) + robotPose.y
+                path.append((globalX, globalY))
+                x += self.MAX_SPEED*curWaypoint.kSpeed/self.UPDATE_RATE
+            return path
 
     def generateSpline(self, x, y, dx):
         a = ((x * dx) - (2 * y)) / (x * x * x)
         b = ((3 * y) - (dx * x)) / (x * x)
         return a, b
 
+    def getYFromCoeffs(self, a, b, x):
+        return (a * x**3) + (b * x**2)
+
+    def getPath(self):
+        path = []
+        for i, waypoint in enumerate(self.waypoints[:-1]):
+            path.extend(self.getPathGeometry(waypoint, self.waypoints[i+1], True))
+        return path
 
 
 
-# /**
-#  * Add your docs here.
-#  */
-# public class CubicSplineFollower {
-#     private static final double MAX_SPEED = 3.3;
-#     private static final double UPDATE_RATE = 200.0;
 
-#     private ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
-#     private Waypoint curWaypoint;
-#     private int index = 0;
-
-#     private Boolean isFinished = false;
-
-#     private static double kRadiusPath = 0.0;
-#     private static final double kRadiusCritical = 0.1;
-#     private static final double kEpsilonPath = 5.0;
-#     private static final double kEpsilonCritical = 3.0;
-#     private static final double kV = 1.0 / 14.0;
-#     private static final double kTurn = 1.5 / 80.0;
-
-#     private Pose pose;
-
-#     double a = 0;
-#     double b = 0;
-
-#     double feedForwardSpeed = 0.0;
-#     double distanceFromWaypoint = 100.0;
-
-#     Boolean debug = false;
-
-#     /**
-#      * Updates the path follower with a new robot pose. Should be called at rate
-#      * equal to {@code UPDATE_RATE}.
-#      *
-#      * @param robotPose the current robot pose, with position and velocities
-#      * @return a tuple with left and right wheel voltages
-#      */
-#     public Tuple updatePursuit(Pose robotPose) {
-#         curWaypoint = waypoints.get(index);
-#         pose = robotPose;
-
-#         feedForwardSpeed = curWaypoint.kSpeed;
-#         debug = false;
-#         if (curWaypoint.isCritical) { // important to be at exactly
-
-#             if (distanceFromWaypoint < Math.abs(feedForwardSpeed) * 1.2) {
-#                 // speed reduces as distance gets smaller
-#                 feedForwardSpeed = Math.copySign(distanceFromWaypoint / 1.2, feedForwardSpeed);
-#                 if (Math.abs(feedForwardSpeed) < 0.25) {
-#                     feedForwardSpeed = Math.copySign(0.25, feedForwardSpeed);
-#                 }
-#             }
-#             if (atWaypoint(kRadiusCritical) || isFinished) {
-#                 debug = true;
-#                 feedForwardSpeed = 0.0;
-#                 if (atHeading(kEpsilonCritical)) {
-#                     // at point and heading, we're done
-#                     if (!isFinished)
-#                         System.out.println("At Waypoint: " + index + " (" + curWaypoint.toString() + ")");
-#                     if (index == waypoints.size() - 1 || isFinished) {
-#                         if (!isFinished)
-#                             System.out.println("Finished Path Following");
-#                         isFinished = true;
-#                         return new Tuple(0.0, 0.0);
-#                     } else {
-#                         index++;
-#                         curWaypoint = waypoints.get(index);
-#                     }
-
-#                 } else {
-#                     // at point but not heading, just turn to the point
-#                     double ptrOutput = DrivetrainControls.turnToAngle(curWaypoint.heading, pose.heading);
-#                     return DrivetrainControls.curvatureDrive(0.0, ptrOutput, true);
-#                 }
-#             }
-#         } else if (atWaypoint(kRadiusPath) && atHeading(kEpsilonPath)) {
-#             // at non-critical waypoint
-#             System.out.println("At Waypoint: " + index + " (" + curWaypoint.toString() + ")");
-#             index++;
-#             curWaypoint = waypoints.get(index);
-#             debug = true;
-#         }
-#         // if not in a special case, just run path following
-#         return pathFollowing();
-#     }
-
-#     /**
-#      * Uses a cubic spline calculated OTF to figure out a projected change in angle
-#      * required to follow path and uses this as a feed forward value in conjuction
-#      * with a d term used to cancel out rotational inertia of the robot. This method
-#      * cheats by setting the initial point of the cubic spline as x=0, y=0, dx=0 to
-#      * make calculations simpler. This means that the waypoint has to be converted
-#      * to local coordinates in reference to the robot.
-#      *
-#      * @return a tuple of left and right output voltages
-#      */
-#     public Tuple pathFollowing() {
-#         calculateDistanceFromWaypoint();
-
-#         double straightPathAngle = Math.atan2(curWaypoint.x - pose.x, curWaypoint.y - pose.y);
-#         double relativeAngle = pose.r - straightPathAngle;
-#         double relativeOpposDist = distanceFromWaypoint * Math.sin(relativeAngle);
-#         double relativeAdjacDist = distanceFromWaypoint * Math.cos(relativeAngle);
-#         double relativeGoalAngle = pose.r - curWaypoint.r;
-#         // relativeGoalAngle = Utils.limit(relativeGoalAngle, Math.PI/3.0,
-#         // -Math.PI/3.0);
-#         double relativeGoalDeriv = Math.atan(relativeGoalAngle);
-#         /*
-#          * Convert from heading in angle form to slope/derivative form. It turns out
-#          * that atan and tan are similar enough to work interchangeably. In fact, atan
-#          * is prefered because it limits the derivate of the waypoint to an angle of 1
-#          * radian, so the cubic spline does not become absurd (at angle of 90, slope is
-#          * inifinity, the cubic spline therefore is a giant peak). Limiting the
-#          * derivative or angle of the waypoint isn't an issue because we do this
-#          * calculation OTF. (The limited tan option is left commented out just in case
-#          * someone wants to play around with that)
-#          */
-
-#         generateSpline(relativeAdjacDist, relativeOpposDist, relativeGoalDeriv);
-
-#         double nextSpeed = ((MAX_SPEED * feedForwardSpeed) * 0.1) + (pose.velocity * 0.9);
-#         double deltaX = nextSpeed / UPDATE_RATE;
-#         if (Math.signum(deltaX) != Math.signum(feedForwardSpeed))
-#             deltaX = 0.0;
-#         /*
-#          * Average of ffSpeed and actual speed scaled by cosine (to account for how far
-#          * off straight the robot has to drive) and cos again (the further off straight
-#          * the longer the curve) then divided by update rate (to get deltaX, the
-#          * position along the spline the robot will be at for the next update, giving a
-#          * feed forward point). If this just used actual speed, a stopped robot would
-#          * not look ahead.
-#          */
-
-#         if (deltaX != 0.0) {
-#             double y2 = (a * deltaX * deltaX * deltaX) + (b * deltaX * deltaX);
-#             double hypot = Geometry.hypotenuse(deltaX, y2);
-#             double ratio = Math.abs(deltaX / hypot);
-#             deltaX *= ratio;
-#         }
-
-#         kRadiusPath = Math.abs(deltaX) * UPDATE_RATE * 0.1;
-#         double dx2 = (3.0 * a * deltaX * deltaX) + (2.0 * b * deltaX);
-#         double relativeFeedForwardAngle = Math.atan(dx2);
-#         /*
-#          * It turns out that tan and atan are relatively interchangeable here, but in
-#          * this case, atan is the actually correct function (convert from ratio to
-#          * angle) and works more accurately, different from above usage, where atan is
-#          * the incorrect function but works more elegantly
-#          */
-
-#         if (false) {
-#             System.out.println(relativeAdjacDist + " " + relativeOpposDist + " " + relativeGoalDeriv);
-#             System.out.println(a + " " + b + " " + deltaX);
-#         }
-
-#         double turnOutput = -Math.toDegrees(relativeFeedForwardAngle) * kTurn;
-#         double outputLeft = ((feedForwardSpeed * kV) + turnOutput) * 12.0;
-#         double outputRight = ((feedForwardSpeed * kV) - turnOutput) * 12.0;
-
-#         return new Tuple(outputLeft, outputRight);
-#     }
-
-#     /**
-#      * Calculates the value of two coefficients (a & b) of a cubic spline specified
-#      * by two points and derivatives.
-#      *
-#      * @Note The first point is assumed to be (0, 0) with a derivative of 0. Second
-#      *       point must be in reference to this point
-#      * @param x  the x coordinate of the second point
-#      * @param y  the y coordinate of the second point
-#      * @param dx the desired slope of the second point
-#      * @implNote Not complicated, just two equations derived from solving the system
-#      *           of equations where x1=0, y1=0, and dx1=0, and x2, y2, and dx2 are
-#      *           specified in relation to p1, and y=ax^3+bx^2+cx+d (c and d are
-#      *           equal to 0 because of definition)
-#      */
-#     private void generateSpline(double x, double y, double dx) {
-#         this.a = ((x * dx) - (2 * y)) / (x * x * x);
-#         this.b = ((3 * y) - (dx * x)) / (x * x);
-#     }
-
-#     /**
-#      * Calculates euclidean distance between robot pose and current waypoint.
-#      * Updates the {@code distanceFromWaypoint} value
-#      */
-#     private void calculateDistanceFromWaypoint() {
-#         distanceFromWaypoint = Geometry.distance(curWaypoint.x, pose.x, curWaypoint.y, pose.y);
-#     }
-
-#     /**
-#      * Helper function to check if the robot is within a radius of the desired
-#      * waypoint
-#      *
-#      * @param radius the desired radius of the robot to the point
-#      * @return true if the robot is within the desired radius of the point
-#      */
-#     private Boolean atWaypoint(double radius) {
-#         // System.out.println(distanceFromWaypoint);
-#         return (distanceFromWaypoint < radius);
-#     }
-
-#     /**
-#      * Helper function to check if the robot heading is within a deadband of the
-#      * desired heading
-#      *
-#      * @param epsilon the tolerance, in degrees, of the robots heading versus the
-#      *                desired
-#      * @return true if the robot is pointing at an angle within the desired epsilon
-#      *         of the waypoint
-#      */
-#     private Boolean atHeading(double epsilon) {
-#         // System.out.println(pose.heading + " " + curWaypoint.heading);
-#         return Utils.withinThreshold(pose.heading, curWaypoint.heading, epsilon);
-#     }
-
-#     /**
-#      * Checks whether or not the robot has finished following the path specified by
-#      * given waypoints
-#      *
-#      * @return true if the robot has finished the path specified
-#      */
-#     public Boolean getIsFinished() {
-#         return isFinished;
-#     }
-
-#     /**
-#      * Clears the array list of waypoints and resets index so that the path follower
-#      * can be used again
-#      */
-#     public void clearWaypoints() {
-#         waypoints.clear();
-#         index = 0;
-#         isFinished = false;
-#     }
-
-#     /**
-#      * Returns the current waypoint being followed by the path follower
-#      *
-#      * @return {@link Waypoint}
-#      */
-#     public Waypoint getCurrentWaypoint() {
-#         return curWaypoint;
-#     }
-
-#     /**
-#      * Adds a waypoint to the list of waypoints (FILO)
-#      *
-#      * @param newWaypoint see {@link Waypoint}
-#      */
-#     public void addWaypoint(Waypoint newWaypoint) {
-#         waypoints.add(newWaypoint);
-#     }
-
-#     /**
-#      * Contains information to define a point along a desired path
-#      */
-#     public static class Waypoint {
-#         // public final Pose point;
-#         protected double kSpeed;
-#         public double x, y, r, heading;
-#         protected Boolean isCritical;
-
-#         /**
-#          * Constructor for waypoint
-#          *
-#          * @param x        in meters
-#          * @param y        in meters
-#          * @param heading  in degrees. Call .r for radians
-#          * @param speed    in desired speed on a scale of -1 to 1
-#          * @param critical whether or not the waypoint is critical. Will stop at a
-#          *                 critical waypoint
-#          */
-#         public Waypoint(double x, double y, double heading, double speed, Boolean critical) {
-#             this.x = x;
-#             this.y = y;
-#             this.r = Math.toRadians(heading);
-#             this.heading = heading;
-#             this.kSpeed = speed;
-#             this.isCritical = critical;
-#         }
-
-#         public Waypoint(double x, double y, double heading) {
-#             this(x, y, heading, 0.0, false);
-#         }
-
-#         public Waypoint(Pose pose) {
-#             this(pose.x, pose.y, pose.heading, 0.0, false);
-
-#         }
-
-#         public Waypoint(double x, double y, double heading, double speed) {
-#             this(x, y, heading, speed, false);
-#         }
-
-#         public String toString() {
-#             return "x: " + x + ", y: " + y + ", heading: " + heading + ", speed: " + kSpeed;
-#         }
-#     }
-
-#     public static void main(String[] args) {
-#     }
-# }
