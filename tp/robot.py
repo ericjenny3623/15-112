@@ -93,16 +93,19 @@ class RobotModel():
             wheelGrossForce = totalTorque / self.WHEEL_RADIUS
 
             wheelNetForce = self.frictionModel(wheelGrossForce, self.velocity)
+            # print(wheelNetForce)
             wheelGroundForce = self.tractionModel(wheelNetForce)
 
             # This should be rotational inertia, but this is decent for now
             newAcceleration = wheelGroundForce / self.PSUEDO_MASS
             # Trapezoidal integration
             self.velocity += (newAcceleration + self.acceleration) / 2 * time
+            if Utils.withinThreshold(self.velocity, 0, 0.001):
+                self.velocity = 0.0
             self.acceleration = newAcceleration
 
         def frictionModel(self, force, speed):
-            if speed == 0.0:
+            if Utils.withinThreshold(speed, 0.0, 0.1):
                 netForce = force
             elif speed < 0.0:
                 netForce = force + self.DRIVETRAIN_FRICTION
