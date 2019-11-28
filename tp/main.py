@@ -11,6 +11,8 @@ import math
 from controls import Controls
 import threading
 import time
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+
 
 
 class SimulationApp(App):
@@ -79,7 +81,8 @@ class SimulationApp(App):
         if self.autoDrivingStart:
             self.autoDrivingStart = False
             startPoint = self.waypoints[self.controls.index]
-            self.robot.center.setPosition(startPoint.x, startPoint.y, heading=startPoint.heading)
+            self.robot.center.setPosition(
+                startPoint.x, startPoint.y, heading=startPoint.heading)
         self.leftVoltage, self.rightVoltage = self.controls.updatePursuit()
 
     def driveUsingKeys(self):
@@ -122,19 +125,26 @@ class SimulationApp(App):
         for i, waypoint in enumerate(self.waypoints):
             self.drawNode(canvas, waypoint, i)
 
-        path = self.controls.getPath()
+        paths = self.controls.getPath()
 
-        for i in range(len(path)-1): #len(path)-1):
-            point = path[i]
-            pX1, pY1 = self.realWorldToAppCoords(point[0], point[1])
-            nextPoint = path[i+1]
-            pX2, pY2 = self.realWorldToAppCoords(nextPoint[0], nextPoint[1])
-            canvas.create_line(pX1, pY1, pX2, pY2, fill="white")
-
+        for x, path in enumerate(paths):
+            if x == 0:
+                color = "yellow"
+            else:
+                color = "white"
+            for i in range(len(path)-1):  # len(path)-1):
+                point = path[i]
+                pX1, pY1 = self.realWorldToAppCoords(point[0], point[1])
+                nextPoint = path[i+1]
+                pX2, pY2 = self.realWorldToAppCoords(
+                    nextPoint[0], nextPoint[1])
+                canvas.create_line(pX1, pY1, pX2, pY2, fill=color)
 
     def keyPressed(self, event):
         key = event.key
-        if key in self.inputKeys:
+        if key == "h":
+            self.superhelp()
+        elif key in self.inputKeys:
             self.inputKeys[key].lastEventRelease = False
         elif key == "Delete":
             if self.selectedWaypoint is not None:
@@ -142,6 +152,7 @@ class SimulationApp(App):
                 self.selectedWaypoint = None
         elif key == "r":
             self.controls.reset()
+            self.autoDriving = False
         elif key == "a":
             self.autoDriving = not self.autoDriving
             self.autoDrivingStart = True
@@ -239,8 +250,8 @@ class SimulationApp(App):
         r2 = r
         if node.isCritical:
             canvas.create_oval(x+r, y+r,
-                    x-r, y-r,
-                    fill="white")
+                               x-r, y-r,
+                               fill="white")
             r2 = 0.7*r
         canvas.create_oval(x+r2, y+r2,
                            x-r2, y-r2,
@@ -260,7 +271,8 @@ class SimulationApp(App):
             red = 255
         elif x > 0.0:
             green = 255
-        color = '#%02x%02x%02x' % (red, green, blue)  # set your favourite rgb color
+        # set your favourite rgb color
+        color = '#%02x%02x%02x' % (red, green, blue)
         return color
 
     def incrementWaypointSpeed(self, delta):
@@ -269,6 +281,21 @@ class SimulationApp(App):
             speed += delta
             speed = Utils.limit(speed, 1.0, -1.0)
             self.selectedWaypoint.kSpeed = speed
+
+    def superhelp(self):
+        print("Arrow keys to move.\n"
+        +     "Click on the screen to create a waypoint, and click\n"
+        +     "  on any already created waypoint to select it.\n"
+        +     "  Double clicking on the waypoint to make it critical \n"
+        +     "  (the robot will slow down and stop there, else \n"
+        +     "  it will just drive through it). The yellow tick \n"
+        +     "  indicates the direction of the waypoint, and can be\n"
+        +     "  dragged to change the direction. The speed is\n"
+        +     "  indicated by the color and controlled by 'w' and 's'.\n"
+        +     "  The waypoint can be deleted by 'del'.\n"
+        +     "To start the robot autodriving, there must be 2 waypoints\n"
+        +     "  and a path should be shown in white. Then 'a' will start\n"
+        +     "  and stop autodriving. 'r' will reset the robot.")
 
 
 class Waypoint(Utils.Twist):
@@ -279,11 +306,13 @@ class Waypoint(Utils.Twist):
         self.isCritical = isCritical
 
     def toString(self):
-        return f"x: {self.x}, y: {self.y}, heading: {self.heading}, speed: {self.kSpeed}, critical: {self.isCritical}"
-
+        return f"x: {round(self.x,2)}, y: {round(self.y,2)}, " + \
+               f"heading: {round(self.heading,2)}, speed: {self.kSpeed}," + \
+               f"critical: {self.isCritical}"
 
     def __repr__(self):
         return self.toString()
+
 
 class KeyLatch():
 
