@@ -27,7 +27,6 @@ class RobotModel():
     def limitVoltage(self, voltage, max):
         return Utils.limit(voltage, max, -max)
 
-
     def updatePositionWithVelocity(self, deltaTime):
         if self.leftSide.velocity != self.rightSide.velocity:
             radius = self.radiusICC(
@@ -63,6 +62,15 @@ class RobotModel():
 
     def velocityICC(self, wheelBase, left, right):
         return (right - left) / wheelBase
+
+    def log(self):
+        return {"x": self.center.x,
+                "y": self.center.y,
+                "heading": self.center.heading,
+                "vel": self.center.velocity,
+                "angVel": self.center.angularVelocity,
+                "leftVel": self.leftSide.velocity,
+                "rightVel": self.rightSide.velocity}
 
     class DrivetrainSide():
 
@@ -160,6 +168,7 @@ class CIMMotor(Motor):
 
     def __init__(self):
         super().__init__(2.41, 5330, 130.1, 3.8)
+
 
 if __name__ == "__main__":
     cim = CIMMotor()

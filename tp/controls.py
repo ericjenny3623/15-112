@@ -20,13 +20,19 @@ class Controls():
         self.MAX_SPEED = 3.3
 
         self.kV = 1.0 / 14.0 * 14.0
-        self.kTurn = 12.0 / 400.0
+        self.kTurn = 12.0 / 450.0
+
+        self.logDict = {"index": self.index,
+                        "waypointX": 0.0,
+                        "waypointY": 0.0}
 
     def reset(self):
         self.index = 0
         self.isFinished = False
 
     def updatePursuit(self):
+        if self.index > len(self.waypoints) - 1:
+            self.index = 0
         curWaypoint = self.waypoints[self.index]
         robotPose = self.robot.center
 
@@ -34,7 +40,8 @@ class Controls():
         distanceToWaypoint = Utils.distance(robotPose.x, robotPose.y,
                                             curWaypoint.x, curWaypoint.y)
         debug = False
-        if curWaypoint.isCritical or self.index == len(self.waypoints) - 1:  # important to be at exactly
+        # important to be at exactly
+        if curWaypoint.isCritical or self.index == len(self.waypoints) - 1:
 
             if distanceToWaypoint < abs(feedForwardSpeed) * 1.2:
                 # speed reduces as distance gets smaller
@@ -103,8 +110,10 @@ class Controls():
             # print(f"{relativeAdjacDist} {relativeOpposDist} {relativeGoalDeriv}")
             print(f"{a} {b} {deltaX}")
 
-        turnOutput = -math.degrees(relativeFeedForwardAngle)*self.UPDATE_RATE * self.kTurn
-        turnLimitedFFSpeed = math.copysign(abs(ffSpeed)-abs(turnOutput/12.0), ffSpeed)
+        turnOutput = -math.degrees(relativeFeedForwardAngle) * \
+            self.UPDATE_RATE * self.kTurn
+        turnLimitedFFSpeed = math.copysign(
+            abs(ffSpeed)-abs(turnOutput/12.0), ffSpeed)
         outputLeft = (turnLimitedFFSpeed * self.kV * 12.0) + turnOutput
         outputRight = (turnLimitedFFSpeed * self.kV * 12.0) - turnOutput
 
@@ -120,9 +129,9 @@ class Controls():
         relativeOpposDist = distanceToWaypoint * math.sin(relativeAngle)
         relativeAdjacDist = distanceToWaypoint * math.cos(relativeAngle)
         relativeGoalAngle = robotPose.r - curWaypoint.r
-        # relativeGoalAngle = Utils.limit(relativeGoalAngle, math.PI/3.0,
-        # -math.PI/3.0)
-        relativeGoalDeriv = math.atan(relativeGoalAngle)
+        relativeGoalAngle = Utils.limit(relativeGoalAngle,
+                                        math.pi*0.3, -math.pi*0.3)
+        relativeGoalDeriv = math.tan(relativeGoalAngle)
         a, b = self.generateSpline(
             relativeAdjacDist, relativeOpposDist, relativeGoalDeriv)
         if not returnPath:
@@ -132,7 +141,8 @@ class Controls():
             cos = math.cos(robotPose.r)
             sin = math.sin(robotPose.r)
             x = 0
-            while abs(x) <= abs(relativeAdjacDist):
+            while abs(x) <= abs(relativeAdjacDist) \
+                    and not Utils.withinThreshold(curWaypoint.kSpeed, 0.0, 0.01):
                 y = self.getYFromCoeffs(a, b, x)
                 globalX = (x * sin) - (y * cos) + robotPose.x
                 globalY = (y * sin) + (x * cos) + robotPose.y
@@ -150,10 +160,16 @@ class Controls():
 
     def getPath(self):
         path = []
+        if len(self.waypoints) > 1 and self.index != 0:
+            path.append(self.getPathGeometry(
+                self.robot.center, self.waypoints[self.index], True))
+        else:
+            path.append([])
         for i, waypoint in enumerate(self.waypoints[:-1]):
-            path.extend(self.getPathGeometry(waypoint, self.waypoints[i+1], True))
+            path.append(self.getPathGeometry(
+                waypoint, self.waypoints[i+1], True))
+
         return path
 
-
-
-
+    def log(self):
+        return self.logDict
