@@ -58,7 +58,7 @@ class SimulationApp(App):
         self.logger = Logger()
         self.logger.log(self.timer, self.robot.log(), "robot.")
         self.graph = Graph(self.logger.time, self.logger.dict["robot.heading"],
-                           (0, 300), (300, 100))
+                           (100, 600), (400, 100))
 
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
@@ -167,7 +167,7 @@ class SimulationApp(App):
         elif key == "s":
             self.incrementWaypointSpeed(-0.05)
         elif key == "p":
-            print(self.logger.dict["robot.heading"].max)
+            print(self.logger.dict["robot.heading"].min)
         else:
             None
 

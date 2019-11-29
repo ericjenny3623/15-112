@@ -32,7 +32,20 @@ class Graph():
         for xScale in self.xAxis.scale:
             x, y = self.graphToCanvasCoords(xScale, self.yAxis.scaleMin)
             canvas.create_text(x, y, text=str(round(xScale,2)), anchor="n")
-        # print(self.xAxis.scaleMin, self.xAxis.scaleRange)
+        self.createLine(canvas, self.xAxis.scaleMin, self.yAxis.scaleMin,
+                        self.xAxis.scaleMin, self.yAxis.scaleMin+self.yAxis.scaleRange,
+                        fill="blue")
+        for yScale in self.yAxis.scale:
+            x, y = self.graphToCanvasCoords(self.xAxis.scaleMin, yScale)
+            canvas.create_text(x, y, text=str(round(yScale, 2)), anchor="e")
+
+        dataPoints = min(len(self.xAxis.data.data), len(self.yAxis.data.data))
+        for i in range(dataPoints-1):
+            x1, y1 = self.xAxis.data.data[i], self.yAxis.data.data[i]
+            x2, y2 = self.xAxis.data.data[i+1], self.yAxis.data.data[i+1]
+            if x1 is None or y1 is None or x2 is None or y2 is None:
+                continue
+            self.createLine(canvas, x1, y1, x2, y2, fill="red")
 
     def graphToCanvasCoords(self, x, y):
         xScaled = (x-self.xAxis.scaleMin) / self.xAxis.scaleRange
@@ -59,9 +72,11 @@ class Axis():
     def setScale(self):
         minRange = self.data.max - self.data.min
         minRange = 1 if minRange == 0 else minRange
+        average = (self.data.max + self.data.min)/2
+        average = 1 if average == 0 else average
         increment = self.roundToSigFigs(
             minRange, 2, math.ceil)/self.increments
-        middle = self.roundToSigFigs(minRange, 2, round)/2
+        middle = self.roundToSigFigs(average, 2, round)
         rangeHalf = int(self.increments/2)
         self.scale = []
         for i in range(-rangeHalf, rangeHalf+1):
@@ -69,6 +84,7 @@ class Axis():
             self.scale.append(rounded)
         self.scaleMin = self.scale[0]
         self.scaleRange = self.scale[-1] - self.scaleMin
+        print(self.label, minRange, middle)
 
     def roundToSigFigs(self, x, sigs, roundFunc):
         if x == 0:
@@ -76,7 +92,7 @@ class Axis():
         power = math.floor(math.log10(abs(x)))
         floatifiedX = x/10**(power-sigs+1)
         rounded = roundFunc(floatifiedX) * 10**(power-sigs+1)
-        return rounded
+        return math.copysign(rounded, x)
 
     def checkScale(self):
         if self.scale[-1] < self.data.max \
