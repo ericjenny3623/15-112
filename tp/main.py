@@ -11,8 +11,8 @@ import math
 from controls import Controls
 import threading
 import time
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
-
+from logger import Logger
+from graph import Graph
 
 
 class SimulationApp(App):
@@ -31,8 +31,6 @@ class SimulationApp(App):
         odometryThread = threading.Thread(
             target=self.odometryPeriodic, daemon=True)
         odometryThread.start()
-
-        self.logger = {}
 
         self.waypoints = []
         self.waypointRadius = 30
@@ -57,9 +55,15 @@ class SimulationApp(App):
             target=self.controlsPeriodic, daemon=True)
         controlThread.start()
 
+        self.logger = Logger()
+        self.logger.log(self.timer, self.robot.log(), "robot.")
+        self.graph = Graph(self.logger.time, self.logger.dict["robot.heading"],
+                           (0, 300), (300, 100))
+
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
         self.timer += deltaTime
+        self.logger.log(self.timer, self.robot.log(), "robot.")
 
     def odometryPeriodic(self):
         while True:
@@ -140,6 +144,8 @@ class SimulationApp(App):
                     nextPoint[0], nextPoint[1])
                 canvas.create_line(pX1, pY1, pX2, pY2, fill=color)
 
+        self.graph.draw(canvas)
+
     def keyPressed(self, event):
         key = event.key
         if key == "h":
@@ -160,6 +166,8 @@ class SimulationApp(App):
             self.incrementWaypointSpeed(0.05)
         elif key == "s":
             self.incrementWaypointSpeed(-0.05)
+        elif key == "p":
+            print(self.logger.dict["robot.heading"].max)
         else:
             None
 

@@ -10,49 +10,77 @@ matplotlib.use('TkAgg')
 
 class Graph():
 
-    def __init__(self):
-
-        self.width = None
-        self.height = None
-        self.label = ""
-        self.xAxis = self.Axis(xData)
-        self.yAxis = self.Axis(yData)
+    def __init__(self, xData, yData, xDims, yDims, title=""):
+        self.cXOrigin, self.cYOrigin = xDims[0], yDims[0]
+        self.width = abs(xDims[1] - xDims[0])
+        self.height = abs(yDims[0] - yDims[1])
+        self.title = title
+        self.xAxis = Axis(xData)
+        self.yAxis = Axis(yData)
+        self.backgroundColor = "white"
+        self.border = 0.05*self.height
 
     def draw(self, canvas):
-        None
+        self.xAxis.checkScale()
+        self.yAxis.checkScale()
+        canvas.create_rectangle(self.cXOrigin, self.cYOrigin,
+                                self.cXOrigin+self.width, self.cYOrigin-self.height,
+                                fill=self.backgroundColor)
+        self.createLine(canvas, self.xAxis.scaleMin, self.yAxis.scaleMin,
+                        self.xAxis.scaleMin+self.xAxis.scaleRange, self.yAxis.scaleMin,
+                        fill="blue")
+        for xScale in self.xAxis.scale:
+            x, y = self.graphToCanvasCoords(xScale, self.yAxis.scaleMin)
+            canvas.create_text(x, y, text=str(round(xScale,2)), anchor="n")
+        # print(self.xAxis.scaleMin, self.xAxis.scaleRange)
+
+    def graphToCanvasCoords(self, x, y):
+        xScaled = (x-self.xAxis.scaleMin) / self.xAxis.scaleRange
+        cX = xScaled * (self.width-(2*self.border)) + self.cXOrigin + self.border
+        yScaled = -(y-self.yAxis.scaleMin) / self.yAxis.scaleRange
+        cY = yScaled * (self.height-(2*self.border)) + self.cYOrigin - self.border
+        return cX, cY
+
+    def createLine(self, canvas, x1, y1, x2, y2, **kwargs):
+        cX1, cY1 = self.graphToCanvasCoords(x1, y1)
+        cX2, cY2 = self.graphToCanvasCoords(x2, y2)
+        # print(cX1, cY1)
+        canvas.create_line(cX1, cY1, cX2, cY2, **kwargs)
 
 
 class Axis():
 
-    def __init__(self, data, increments=1):
+    def __init__(self, data, increments=2):
         self.data = data
-        self.min = min(data)
-        self.max = max(data)
+        self.label = self.data.label
         self.increments = increments
         self.setScale()
 
     def setScale(self):
-        minRange = self.max - self.min
+        minRange = self.data.max - self.data.min
+        minRange = 1 if minRange == 0 else minRange
         increment = self.roundToSigFigs(
             minRange, 2, math.ceil)/self.increments
         middle = self.roundToSigFigs(minRange, 2, round)/2
         rangeHalf = int(self.increments/2)
         self.scale = []
         for i in range(-rangeHalf, rangeHalf+1):
-            self.scale.append(middle + (increment*i))
+            rounded = self.roundToSigFigs(middle + (increment*i), 2, round)
+            self.scale.append(rounded)
+        self.scaleMin = self.scale[0]
+        self.scaleRange = self.scale[-1] - self.scaleMin
 
     def roundToSigFigs(self, x, sigs, roundFunc):
+        if x == 0:
+            return 0
         power = math.floor(math.log10(abs(x)))
         floatifiedX = x/10**(power-sigs+1)
         rounded = roundFunc(floatifiedX) * 10**(power-sigs+1)
         return rounded
 
-    def udpate(self, newData):
-        if newData < self.min:
-            self.min = newData
-            self.setScale()
-        elif newData > self.max:
-            self.max = self.max
+    def checkScale(self):
+        if self.scale[-1] < self.data.max \
+                or self.scale[0] > self.data.min:
             self.setScale()
 
 
