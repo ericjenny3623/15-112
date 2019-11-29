@@ -84,7 +84,6 @@ class Axis():
             self.scale.append(rounded)
         self.scaleMin = self.scale[0]
         self.scaleRange = self.scale[-1] - self.scaleMin
-        print(self.label, minRange, middle)
 
     def roundToSigFigs(self, x, sigs, roundFunc):
         if x == 0:
