@@ -56,14 +56,15 @@ class SimulationApp(App):
         controlThread.start()
 
         self.logger = Logger()
-        self.logger.log(self.timer, self.robot.log(), "robot.")
+        self.logger.registerLoggerDict(self.robot.logDict, "robot")
+        self.logger.registerLoggerDict(self.controls.logDict, "controls")
         self.graph = Graph(self.logger.time, self.logger.dict["robot.heading"],
                            (100, 600), (400, 100))
 
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
         self.timer += deltaTime
-        self.logger.log(self.timer, self.robot.log(), "robot.")
+        self.logger.log(self.timer)
 
     def odometryPeriodic(self):
         while True:

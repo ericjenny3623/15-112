@@ -22,9 +22,9 @@ class Controls():
         self.kV = 1.0 / 14.0 * 14.0
         self.kTurn = 12.0 / 450.0
 
-        self.logDict = {"index": self.index,
-                        "waypointX": 0.0,
-                        "waypointY": 0.0}
+        self.logDict = {"index": None,
+                        "waypointX": None,
+                        "waypointY": None}
 
     def reset(self):
         self.index = 0
@@ -170,6 +170,3 @@ class Controls():
                 waypoint, self.waypoints[i+1], True))
 
         return path
-
-    def log(self):
-        return self.logDict

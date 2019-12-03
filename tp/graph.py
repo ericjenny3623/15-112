@@ -8,6 +8,19 @@ import math
 matplotlib.use('TkAgg')
 
 
+class StackedTimeGraph():
+
+    def __init__(self, timeData, yDataLists, xDims, yDims):
+        self.graphs = {}
+        yIncrement = abs(yDims[0] - yDims[1])/len(yDataLists)
+        graphYOrigin = yDims[0]
+        for yData in yDataLists:
+            graphYDims = (graphYOrigin, graphYOrigin + yIncrement)
+            graphYOrigin += yIncrement
+            self.graphs[yData.label] = Graph(timeData, yData, xDims, graphYDims)
+
+
+
 class Graph():
 
     def __init__(self, xData, yData, xDims, yDims, title=""):

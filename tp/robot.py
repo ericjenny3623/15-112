@@ -9,6 +9,14 @@ class RobotModel():
         self.leftSide, self.rightSide = self.DrivetrainSide(), self.DrivetrainSide()
         self.WHEEL_BASE = 0.67  # Meters
 
+        self.logDict = {"x": None,
+                        "y": None,
+                        "heading": None,
+                        "vel": None,
+                        "angVel": None,
+                        "leftVel": None,
+                        "rightVel": None}
+
     def setPosition(self, x, y, heading):
         self.center.setPosition(x, y, heading)
 
@@ -18,11 +26,11 @@ class RobotModel():
         self.rightSide.velocity = 0.0
         self.rightSide.acceleration = 0.0
 
-    def updateVoltage(self, leftVoltage, rightVoltage, time):
+    def updateVoltage(self, leftVoltage, rightVoltage, deltaTime):
         leftVoltage = self.limitVoltage(leftVoltage, 12.0)
         rightVoltage = self.limitVoltage(rightVoltage, 12.0)
-        self.leftSide.updateVoltage(leftVoltage, time)
-        self.rightSide.updateVoltage(rightVoltage, time)
+        self.leftSide.updateVoltage(leftVoltage, deltaTime)
+        self.rightSide.updateVoltage(rightVoltage, deltaTime)
 
     def limitVoltage(self, voltage, max):
         return Utils.limit(voltage, max, -max)
@@ -55,6 +63,14 @@ class RobotModel():
             self.leftSide.velocity + self.rightSide.velocity) / 2.0
         self.center.angularVelocity = -math.degrees(theta) / deltaTime
 
+        self.logDict["x"] = self.center.x
+        self.logDict["y"] = self.center.y
+        self.logDict["heading"] = self.center.heading
+        self.logDict["vel"] = self.center.velocity
+        self.logDict["angVel"] = self.center.angularVelocity
+        self.logDict["leftVel"] = self.leftSide.velocity
+        self.logDict["rightVel"] = self.rightSide.velocity
+
         # print(self.leftSide.velocity, self.rightSide.velocity)
 
     def radiusICC(self, wheelBase, left, right):
@@ -62,15 +78,6 @@ class RobotModel():
 
     def velocityICC(self, wheelBase, left, right):
         return (right - left) / wheelBase
-
-    def log(self):
-        return {"x": self.center.x,
-                "y": self.center.y,
-                "heading": self.center.heading,
-                "vel": self.center.velocity,
-                "angVel": self.center.angularVelocity,
-                "leftVel": self.leftSide.velocity,
-                "rightVel": self.rightSide.velocity}
 
     class DrivetrainSide():
 
