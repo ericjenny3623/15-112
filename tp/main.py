@@ -12,7 +12,7 @@ from controls import Controls
 import threading
 import time
 from logger import Logger
-from graph import Graph
+from graph import StackedTimeGraph
 
 
 class SimulationApp(App):
@@ -58,8 +58,10 @@ class SimulationApp(App):
         self.logger = Logger()
         self.logger.registerLoggerDict(self.robot.logDict, "robot")
         self.logger.registerLoggerDict(self.controls.logDict, "controls")
-        self.graph = Graph(self.logger.time, self.logger.dict["robot.heading"],
-                           (100, 600), (400, 100))
+        yAxes = [self.logger.dict["robot.heading"],
+                 self.logger.dict["controls.ffSpeed"]]
+        self.graph = StackedTimeGraph(self.logger.time, yAxes,
+                           (self.fieldImageWidth, self.width), (self.height, 0))
 
     def timerFired(self):
         deltaTime = self.timerDelay/1000.0
@@ -67,7 +69,7 @@ class SimulationApp(App):
         self.logger.log(self.timer)
 
     def odometryPeriodic(self):
-        while True:
+        while self._running:
             deltaTime = 1.0/self.ODOMETRY_UPDATE_RATE
             self.robot.updateVoltage(
                 self.leftVoltage, self.rightVoltage, deltaTime)
@@ -75,7 +77,7 @@ class SimulationApp(App):
             time.sleep(deltaTime)
 
     def controlsPeriodic(self):
-        while True:
+        while self._running:
             if self.autoDriving and self.waypoints:
                 self.driveUsingPursuit()
             else:
@@ -119,7 +121,7 @@ class SimulationApp(App):
             self.rightVoltage += turnVoltage
 
     def redrawAll(self, canvas):
-        canvas.create_image(self.width/2, self.height/2,
+        canvas.create_image(self.fieldImageWidth/2, self.height/2,
                             image=self.fieldImageScaled)
         robotAppX, robotAppY = self.realWorldToAppCoords(
             self.robot.center.x, self.robot.center.y)
@@ -227,12 +229,12 @@ class SimulationApp(App):
         None
 
     def realWorldToAppCoords(self, x, y):
-        newX = (self.width/2) + (self.width/self.FIELD_REAL_WIDTH*x)
+        newX = (self.fieldImageWidth/2) + (self.fieldImageWidth/self.FIELD_REAL_WIDTH*x)
         newY = (self.height) - (self.height/self.FIELD_REAL_HEIGHT*y)
         return int(newX), int(newY)
 
     def appToRealWorldCoords(self, x, y):
-        newX = (x - self.width/2) / (self.width/self.FIELD_REAL_WIDTH)
+        newX = (x - self.fieldImageWidth/2) / (self.fieldImageWidth/self.FIELD_REAL_WIDTH)
         newY = (self.height - y) / (self.height/self.FIELD_REAL_HEIGHT)
         return newX, newY
 
@@ -247,9 +249,10 @@ class SimulationApp(App):
             scaleFactor = screenWidth/imageWidth*0.9
 
         self.height = int(imageHeight * scaleFactor)
-        self.width = int(imageWidth * scaleFactor)
+        self.width = int(imageWidth * scaleFactor + screenWidth * 0.3)
         self.setSize(self.width, self.height)
         scaledFieldImage = self.scaleImage(self._fieldImage, scaleFactor)
+        self.fieldImageWidth = scaledFieldImage.size[0]
         self.fieldImageScaled = ImageTk.PhotoImage(scaledFieldImage)
 
     def drawNode(self, canvas, node, i):

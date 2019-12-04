@@ -5,17 +5,21 @@ class Logger():
     def __init__(self):
         self.dict = {}
         self.time = DataList("time")
+        self.len = 0
         self.index = 0
         self.loggers = {}
 
-    def registerLoggerDict(self, logDict, name):
-        if name not in self.loggers:
-            self.loggers[name] = logDict
+    def registerLoggerDict(self, logDict, category):
+        if category not in self.loggers:
+            self.loggers[category] = logDict
+            for key in logDict:
+                masterKey = category + "." + key
+                self.dict[masterKey] = DataList(masterKey, self.len)
+
 
     def log(self, time):
-        assert (self.index == 0 or time > self.time.data[-1],
-                "Time value in past")
-        self.index += 1
+        assert self.len == 0 or time > self.time.data[-1], "Time value in past"
+        self.len += 1
         self.time.append(time)
 
         for genre in self.loggers:
@@ -25,8 +29,7 @@ class Logger():
                 self.dict[masterKey].append(logDict[key])
 
         for listKey in self.dict:
-            assert(len(self.dict[listKey]) == self.index+1,
-                    "Logger dict lists not equal length, category not updated")
+            assert self.dict[listKey].len == self.len, "Logger dict lists not equal length, category not updated"
 
     def logIndividual(self, time, dataSet, prefix=""):
         if self.index == 0 or time > self.time.data[-1]:
@@ -64,9 +67,11 @@ class DataList():
         self.label = label
         self.min = 0
         self.max = 0
+        self.len = noneLength
 
     def append(self, data):
         self.data.append(data)
+        self.len += 1
         if data is None:
             return
         if data < self.min:

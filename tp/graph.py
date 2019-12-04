@@ -12,12 +12,18 @@ class StackedTimeGraph():
 
     def __init__(self, timeData, yDataLists, xDims, yDims):
         self.graphs = {}
-        yIncrement = abs(yDims[0] - yDims[1])/len(yDataLists)
+        yDecrement = abs(yDims[0] - yDims[1])/len(yDataLists)
         graphYOrigin = yDims[0]
         for yData in yDataLists:
-            graphYDims = (graphYOrigin, graphYOrigin + yIncrement)
-            graphYOrigin += yIncrement
+            graphYDims = (graphYOrigin, graphYOrigin - yDecrement)
+            print(graphYDims)
+            graphYOrigin -= yDecrement
             self.graphs[yData.label] = Graph(timeData, yData, xDims, graphYDims)
+
+    def draw(self, canvas):
+        for graphKey in self.graphs:
+            graph = self.graphs[graphKey]
+            graph.draw(canvas)
 
 
 
@@ -31,7 +37,7 @@ class Graph():
         self.xAxis = Axis(xData)
         self.yAxis = Axis(yData)
         self.backgroundColor = "white"
-        self.border = 0.05*self.height
+        self.border = 0.1*self.height
 
     def draw(self, canvas):
         self.xAxis.checkScale()
@@ -44,13 +50,13 @@ class Graph():
                         fill="blue")
         for xScale in self.xAxis.scale:
             x, y = self.graphToCanvasCoords(xScale, self.yAxis.scaleMin)
-            canvas.create_text(x, y, text=str(round(xScale,2)), anchor="n")
+            canvas.create_text(x, y, text=str(xScale), anchor="n")
         self.createLine(canvas, self.xAxis.scaleMin, self.yAxis.scaleMin,
                         self.xAxis.scaleMin, self.yAxis.scaleMin+self.yAxis.scaleRange,
                         fill="blue")
         for yScale in self.yAxis.scale:
             x, y = self.graphToCanvasCoords(self.xAxis.scaleMin, yScale)
-            canvas.create_text(x, y, text=str(round(yScale, 2)), anchor="e")
+            canvas.create_text(x, y, text=str(yScale), anchor="e")
 
         dataPoints = min(len(self.xAxis.data.data), len(self.yAxis.data.data))
         for i in range(dataPoints-1):
@@ -84,21 +90,20 @@ class Axis():
 
     def setScale(self):
         minRange = self.data.max - self.data.min
-        minRange = 1 if minRange == 0 else minRange
-        average = (self.data.max + self.data.min)/2
-        average = 1 if average == 0 else average
-        increment = self.roundToSigFigs(
-            minRange, 2, math.ceil)/self.increments
-        middle = self.roundToSigFigs(average, 2, round)
+        if minRange == 0:
+            minRange = 1
+        average = self.roundSigFigs(self.data.max+self.data.min, 2, math.ceil)/2
+        increment = self.roundSigFigs(minRange, 2, math.ceil)/self.increments
+        middle = self.roundSigFigs(average, 2, round)
         rangeHalf = int(self.increments/2)
         self.scale = []
         for i in range(-rangeHalf, rangeHalf+1):
-            rounded = self.roundToSigFigs(middle + (increment*i), 2, round)
-            self.scale.append(rounded)
+            rounded = self.roundSigFigs(middle + (increment*i), 2, round)
+            self.scale.append(round(rounded, 2))
         self.scaleMin = self.scale[0]
         self.scaleRange = self.scale[-1] - self.scaleMin
 
-    def roundToSigFigs(self, x, sigs, roundFunc):
+    def roundSigFigs(self, x, sigs, roundFunc):
         if x == 0:
             return 0
         power = math.floor(math.log10(abs(x)))

@@ -24,7 +24,8 @@ class Controls():
 
         self.logDict = {"index": None,
                         "waypointX": None,
-                        "waypointY": None}
+                        "waypointY": None,
+                        "ffSpeed": None}
 
     def reset(self):
         self.index = 0
@@ -83,6 +84,7 @@ class Controls():
             debug = True
 
         # if not in a special case, just run path following
+        self.logDict["ffSpeed"] = feedForwardSpeed
         return self.pathFollowing(feedForwardSpeed)
 
     def pathFollowing(self, ffSpeed):
@@ -114,6 +116,7 @@ class Controls():
             self.UPDATE_RATE * self.kTurn
         turnLimitedFFSpeed = math.copysign(
             abs(ffSpeed)-abs(turnOutput/12.0), ffSpeed)
+        self.logDict["ffSpeed"] = turnLimitedFFSpeed
         outputLeft = (turnLimitedFFSpeed * self.kV * 12.0) + turnOutput
         outputRight = (turnLimitedFFSpeed * self.kV * 12.0) - turnOutput
 
