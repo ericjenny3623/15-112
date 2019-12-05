@@ -14,8 +14,8 @@
 #     print(value)
 
 
-a = [1, 2, 3, 4, 5]
+a = [1, 2, 3, 6, 4, 5]
 for x in a:
-    if x == 3:
+    if x % 3 == 0:
         a.remove(x)
 print(a)
