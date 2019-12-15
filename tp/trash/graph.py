@@ -1,12 +1,7 @@
 from tkinter import *
 from cmu_112_graphics import *
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
-import matplotlib
 import math
 from bisect import bisect_left
-matplotlib.use('TkAgg')
 
 
 class StackedTimeGraph():

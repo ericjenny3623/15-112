@@ -1,3 +1,5 @@
+# Class which robustly handles logging from multiple sources and
+# is time "synchronous"
 
 
 class Logger():

@@ -1,25 +1,23 @@
 from tkinter import *
 from cmu_112_graphics import *
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
-import matplotlib
 import math
 from bisect import bisect_left
-matplotlib.use('TkAgg')
+
+# Has various classes used to create graphs using tkinter canvas
 
 
 class StackedTimeGraph():
 
     def __init__(self, timeData, yDataLists, xDims, yDims):
         self.graphs = {}
-        self.border = 75
+        self.border = 40
         yDecrement = abs(yDims[0] - yDims[1])/len(yDataLists)
         graphYOrigin = yDims[0]
         for yData in yDataLists:
             graphYDims = (graphYOrigin, graphYOrigin - yDecrement)
             graphYOrigin -= yDecrement
-            self.graphs[yData.label] = Graph(timeData, yData, xDims, graphYDims, border=self.border)
+            self.graphs[yData.label] = Graph(
+                timeData, yData, xDims, graphYDims, border=self.border)
 
     def draw(self, canvas):
         for graphKey in self.graphs:
@@ -29,6 +27,7 @@ class StackedTimeGraph():
     def updateHover(self, x):
         for graphKey in self.graphs:
             self.graphs[graphKey].selectPoint(x)
+
 
 class Graph():
 
@@ -92,9 +91,11 @@ class Graph():
 
     def graphToCanvasCoords(self, x, y):
         xScaled = (x-self.xAxis.scaleMin) / self.xAxis.scaleRange
-        cX = xScaled * (self.width-(2*self.border)) + self.cXOrigin + self.border
+        cX = xScaled * (self.width-(2*self.border)) + \
+            self.cXOrigin + self.border
         yScaled = -(y-self.yAxis.scaleMin) / self.yAxis.scaleRange
-        cY = yScaled * (self.height-(2*self.border)) + self.cYOrigin - self.border
+        cY = yScaled * (self.height-(2*self.border)) + \
+            self.cYOrigin - self.border
         return cX, cY
 
     def createLine(self, canvas, x1, y1, x2, y2, **kwargs):
@@ -117,7 +118,6 @@ class Graph():
             self.selectedIndex = None
 
 
-
 class Axis():
 
     def __init__(self, data, increments=2):
@@ -130,7 +130,8 @@ class Axis():
         minRange = self.data.max - self.data.min
         if minRange == 0:
             minRange = 1
-        average = self.roundSigFigs(self.data.max+self.data.min, 2, math.ceil)/2
+        average = self.roundSigFigs(
+            self.data.max+self.data.min, 2, math.ceil)/2
         increment = self.roundSigFigs(minRange, 2, math.ceil)/self.increments
         middle = self.roundSigFigs(average, 2, round)
         rangeHalf = int(self.increments/2)
@@ -154,8 +155,9 @@ class Axis():
                 or self.scale[0] > self.data.min:
             self.setScale()
         elif self.data.max-self.data.min != 0.0 and \
-            self.scale[-1] - self.data.max > (self.data.max-self.data.min)*0.2:
+                self.scale[-1] - self.data.max > (self.data.max-self.data.min)*0.2:
             self.setScale()
+
 
 if __name__ == "__main__":
     data = [-2.0, 0.1, 0.2, 360]

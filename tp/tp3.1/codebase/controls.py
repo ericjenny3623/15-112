@@ -1,6 +1,9 @@
 import math
 import Utils
 
+# Class has methods which control the robots movement along
+# a path specified by a list of waypoints
+
 
 class Controls():
 

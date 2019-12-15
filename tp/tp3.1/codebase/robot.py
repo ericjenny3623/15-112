@@ -1,6 +1,8 @@
 import Utils
 import math
 
+# Models a differential drive robot movement and motors
+
 
 class RobotModel():
 

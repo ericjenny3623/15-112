@@ -1,5 +1,6 @@
 import math
 
+# various methods which are used by multiple classes
 
 def withinThreshold(value, goal, epsilon):
     return abs(value-goal) <= epsilon
